@@ -36,13 +36,17 @@ jobs:
     - name: Restore Debug Keystore and Environment Config
       run: |
         if [ -f "debug.keystore.base64" ]; then
-          base64 -d debug.keystore.base64 > debug.keystore
+          base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
+        fi
+        if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
+          keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keypass android -storepass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
         fi
         if [ ! -f ".env" ] && [ -f ".env.example" ]; then
           cp .env.example .env
         elif [ ! -f ".env" ]; then
           touch .env
         fi
+        ls -la debug.keystore
 
     - name: Build Android APK
       run: ./gradlew assembleDebug --stacktrace --info --no-daemon -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m"
