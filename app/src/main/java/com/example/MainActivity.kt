@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Sensors
@@ -34,6 +35,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -63,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.MainViewModel
 import com.example.ui.NavigationTab
 import com.example.ui.dialogs.FilePreviewDialog
+import com.example.ui.dialogs.GitHubHubDialog
 import com.example.ui.screens.BluetoothRadarScreen
 import com.example.ui.screens.ConflictsScreen
 import com.example.ui.screens.LiveSyncScreen
@@ -168,6 +171,26 @@ fun SyncBeamAppContent(viewModel: MainViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.showGitHubHubDialog(true) },
+                        modifier = Modifier.testTag("github_hub_top_btn")
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudSync,
+                                    contentDescription = "GitHub Direct Hub",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = Color(0xFF064E3B),
@@ -289,6 +312,29 @@ fun SyncBeamAppContent(viewModel: MainViewModel) {
             onDismiss = { viewModel.closePreview() },
             onSaveEdit = { newContent -> viewModel.updateNote(file.id, newContent) },
             onTogglePin = { viewModel.togglePin(file.id, !file.isPinned) }
+        )
+    }
+
+    // GitHub Direct Hub Dialog
+    if (uiState.isGitHubHubDialog) {
+        GitHubHubDialog(
+            uiState = uiState,
+            onDismiss = { viewModel.showGitHubHubDialog(false) },
+            onDownloadFile = { url, name ->
+                viewModel.downloadFromGitHub(url, name)
+            },
+            onFetchRelease = { owner, repo ->
+                viewModel.fetchGitHubReleases(owner, repo)
+            },
+            onFetchContents = { owner, repo, path ->
+                viewModel.fetchGitHubContents(owner, repo, path)
+            },
+            onExportGist = { file, isPublic, token ->
+                viewModel.exportFileToGist(file, isPublic, token)
+            },
+            onShowSnackbar = { msg ->
+                viewModel.showSnackbar(msg)
+            }
         )
     }
 }

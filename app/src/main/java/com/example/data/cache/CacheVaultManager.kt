@@ -68,6 +68,57 @@ class CacheVaultManager(private val context: Context) {
             Triple(targetFile, hash, bytes.size.toLong())
         }
 
+    suspend fun saveBytesToVault(name: String, bytes: ByteArray): Triple<File, String, Long> =
+        withContext(Dispatchers.IO) {
+            val digest = MessageDigest.getInstance("SHA-256")
+            val hash = digest.digest(bytes).joinToString("") { "%02x".format(it) }
+            val sanitized = sanitizeFileName(name)
+            val targetFile = File(vaultDir, "$hash-$sanitized")
+            targetFile.writeBytes(bytes)
+            Triple(targetFile, hash, bytes.size.toLong())
+        }
+
+    suspend fun readTextDocument(filePath: String?): String? = withContext(Dispatchers.IO) {
+        if (filePath == null) return@withContext null
+        val file = File(filePath)
+        if (!file.exists()) return@withContext null
+        try {
+            file.readText(Charsets.UTF_8)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun determineMimeType(fileName: String): String {
+        val ext = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)
+        return when (ext) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "gif" -> "image/gif"
+            "svg" -> "image/svg+xml"
+            "mp4" -> "video/mp4"
+            "mkv" -> "video/x-matroska"
+            "mp3" -> "audio/mpeg"
+            "wav" -> "audio/wav"
+            "pdf" -> "application/pdf"
+            "txt" -> "text/plain"
+            "md" -> "text/markdown"
+            "json" -> "application/json"
+            "xml" -> "text/xml"
+            "kt" -> "text/x-kotlin"
+            "java" -> "text/x-java"
+            "py" -> "text/x-python"
+            "js" -> "text/javascript"
+            "ts" -> "text/typescript"
+            "html" -> "text/html"
+            "css" -> "text/css"
+            "zip" -> "application/zip"
+            "apk" -> "application/vnd.android.package-archive"
+            else -> "application/octet-stream"
+        }
+    }
+
     suspend fun createChunkStream(file: File, chunkSize: Int = 64 * 1024): List<ByteArray> =
         withContext(Dispatchers.IO) {
             if (!file.exists()) return@withContext emptyList()

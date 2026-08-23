@@ -244,7 +244,8 @@ fun VaultScreen(
                 EmptyVaultView(
                     hasSearch = uiState.searchQuery.isNotBlank(),
                     onAddNote = { viewModel.showCreateNoteDialog(true) },
-                    onImportFile = { filePickerLauncher.launch("*/*") }
+                    onImportFile = { filePickerLauncher.launch("*/*") },
+                    onOpenGitHub = { viewModel.showGitHubHubDialog(true) }
                 )
             } else {
                 LazyColumn(
@@ -259,20 +260,37 @@ fun VaultScreen(
                             onSync = { showPeerPickerForFile = file },
                             onSimulateConflict = { showSimulateConflictForFile = file },
                             onTogglePin = { viewModel.togglePin(file.id, !file.isPinned) },
-                            onDelete = { viewModel.deleteFile(file.id) }
+                            onDelete = { viewModel.deleteFile(file.id) },
+                            onExportGist = { viewModel.showGitHubHubDialog(true) }
                         )
                     }
                 }
             }
         }
 
-        // Floating Action Buttons
+            // Floating Action Buttons
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 16.dp, end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            FloatingActionButton(
+                onClick = { viewModel.showGitHubHubDialog(true) },
+                containerColor = Color(0xFF24292E),
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("github_fab")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CloudSync,
+                    contentDescription = "GitHub Direct Hub",
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
             FloatingActionButton(
                 onClick = { filePickerLauncher.launch("*/*") },
                 containerColor = MaterialTheme.colorScheme.secondary,
@@ -429,7 +447,8 @@ fun VaultFileCard(
     onSync: () -> Unit,
     onSimulateConflict: () -> Unit,
     onTogglePin: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onExportGist: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
@@ -554,6 +573,14 @@ fun VaultFileCard(
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text("Export to GitHub Gist") },
+                            leadingIcon = { Icon(Icons.Default.CloudSync, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                            onClick = {
+                                menuExpanded = false
+                                onExportGist()
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text(if (file.isPinned) "Unpin from Cache" else "Pin in Cache (Never Evict)") },
                             leadingIcon = { Icon(if (file.isPinned) Icons.Outlined.PushPin else Icons.Filled.PushPin, contentDescription = null) },
                             onClick = {
@@ -623,7 +650,8 @@ fun VaultFileCard(
 private fun EmptyVaultView(
     hasSearch: Boolean,
     onAddNote: () -> Unit,
-    onImportFile: () -> Unit
+    onImportFile: () -> Unit,
+    onOpenGitHub: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -684,6 +712,18 @@ private fun EmptyVaultView(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Import File")
                 }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onOpenGitHub,
+                shape = RoundedCornerShape(12.dp),
+                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Download Directly from GitHub")
             }
         }
     }

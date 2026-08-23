@@ -7,6 +7,10 @@ import com.example.data.cache.CacheVaultManager
 import com.example.data.cache.VectorClockComparison
 import com.example.data.cache.VectorClockEngine
 import com.example.data.db.SyncBeamDatabase
+import com.example.data.github.GitHubDownloadResult
+import com.example.data.github.GitHubFileItem
+import com.example.data.github.GitHubReleaseInfo
+import com.example.data.github.GitHubSyncService
 import com.example.data.model.ConflictStatus
 import com.example.data.model.FileCategory
 import com.example.data.model.PeerDevice
@@ -37,7 +41,8 @@ class SyncBeamRepository(
     val vectorClockEngine: VectorClockEngine,
     val bluetoothEngine: BluetoothSyncEngine,
     val localDeviceId: String,
-    val localDeviceName: String
+    val localDeviceName: String,
+    val gitHubService: GitHubSyncService = GitHubSyncService(context.cacheDir)
 ) {
     private val fileDao = database.syncedFileDao()
     private val conflictDao = database.syncConflictDao()
@@ -161,6 +166,87 @@ class SyncBeamRepository(
             "File Updated Locally",
             "${existing.name} updated to v$newVersion",
             null
+        )
+    }
+
+    suspend fun downloadFromGitHub(
+        urlOrPath: String,
+        customName: String? = null,
+        onProgress: ((Float, Long, Long) -> Unit)? = null
+    ): GitHubDownloadResult = withContext(Dispatchers.IO) {
+        val result = gitHubService.downloadDirectFile(
+            rawOrGitHubUrl = urlOrPath,
+            customFileName = customName,
+            onProgress = onProgress
+        )
+
+        if (result.success && result.localFile != null) {
+            val file = result.localFile
+            val (savedFile, hash, size) = vaultManager.saveBytesToVault(
+                name = result.fileName,
+                bytes = file.readBytes()
+            )
+            val mimeType = vaultManager.determineMimeType(result.fileName)
+            val category = vaultManager.determineCategory(result.fileName, mimeType)
+            val textPreview = result.textContent?.take(1000) ?: vaultManager.extractTextPreview(savedFile)
+
+            val (newClock, newVersion) = vectorClockEngine.incrementLocal("{}")
+
+            val syncedFile = SyncedFile(
+                id = hash,
+                name = result.fileName,
+                sizeBytes = size,
+                mimeType = mimeType,
+                contentHash = hash,
+                localFilePath = savedFile.absolutePath,
+                versionNumber = newVersion,
+                originDeviceId = "github-import",
+                originDeviceName = "GitHub Remote",
+                lastModifiedTimestamp = System.currentTimeMillis(),
+                lamportTimestamp = 1L,
+                vectorClockJson = newClock,
+                syncStatus = SyncStatus.LOCAL_ONLY,
+                category = category,
+                textPreview = textPreview
+            )
+
+            fileDao.insertOrUpdate(syncedFile)
+            bluetoothEngine.logEvent(
+                "GITHUB_IMPORT",
+                "Downloaded from GitHub",
+                "${result.fileName} (${syncedFile.sizeFormatted}) ready for offline mesh sync",
+                "GitHub Cloud"
+            )
+        }
+
+        result
+    }
+
+    suspend fun fetchGitHubReleases(owner: String, repo: String): Result<GitHubReleaseInfo> =
+        withContext(Dispatchers.IO) {
+            gitHubService.getLatestRelease(owner, repo)
+        }
+
+    suspend fun fetchGitHubContents(owner: String, repo: String, path: String = ""): Result<List<GitHubFileItem>> =
+        withContext(Dispatchers.IO) {
+            gitHubService.listRepositoryContents(owner, repo, path)
+        }
+
+    suspend fun exportVaultFileToGist(
+        file: SyncedFile,
+        isPublic: Boolean = false,
+        token: String? = null
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val content = vaultManager.readTextDocument(file.localFilePath)
+            ?: file.textPreview
+            ?: return@withContext Result.failure(Exception("File content cannot be read as text for Gist"))
+
+        gitHubService.exportToGist(
+            fileName = file.name,
+            content = content,
+            description = "Exported from SyncBeam Mesh Vault (${file.name})",
+            isPublic = isPublic,
+            token = token
         )
     }
 

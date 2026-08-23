@@ -58,6 +58,12 @@ data class UiState(
     val isCreatingNoteDialog: Boolean = false,
     val isAddPeerDialog: Boolean = false,
     val isStorageSettingsDialog: Boolean = false,
+    val isGitHubHubDialog: Boolean = false,
+    val isGitHubLoading: Boolean = false,
+    val gitHubDownloadProgress: Float = 0f,
+    val gitHubLatestRelease: com.example.data.github.GitHubReleaseInfo? = null,
+    val gitHubRepoFiles: List<com.example.data.github.GitHubFileItem> = emptyList(),
+    val gitHubGistUrl: String? = null,
     val quotaLimitGb: Float = 2.0f,
     val autoSyncOnConnect: Boolean = true,
     val meshRelayEnabled: Boolean = true,
@@ -75,6 +81,12 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
     private val _isCreatingNoteDialog = MutableStateFlow(false)
     private val _isAddPeerDialog = MutableStateFlow(false)
     private val _isStorageSettingsDialog = MutableStateFlow(false)
+    private val _isGitHubHubDialog = MutableStateFlow(false)
+    private val _isGitHubLoading = MutableStateFlow(false)
+    private val _gitHubDownloadProgress = MutableStateFlow(0f)
+    private val _gitHubLatestRelease = MutableStateFlow<com.example.data.github.GitHubReleaseInfo?>(null)
+    private val _gitHubRepoFiles = MutableStateFlow<List<com.example.data.github.GitHubFileItem>>(emptyList())
+    private val _gitHubGistUrl = MutableStateFlow<String?>(null)
     private val _quotaLimitGb = MutableStateFlow(2.0f)
     private val _autoSyncOnConnect = MutableStateFlow(true)
     private val _meshRelayEnabled = MutableStateFlow(true)
@@ -98,6 +110,12 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
         _isCreatingNoteDialog,
         _isAddPeerDialog,
         _isStorageSettingsDialog,
+        _isGitHubHubDialog,
+        _isGitHubLoading,
+        _gitHubDownloadProgress,
+        _gitHubLatestRelease,
+        _gitHubRepoFiles,
+        _gitHubGistUrl,
         _quotaLimitGb,
         _autoSyncOnConnect,
         _meshRelayEnabled,
@@ -120,10 +138,16 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
         val isCreatingNote = params[14] as Boolean
         val isAddPeer = params[15] as Boolean
         val isStorageSettings = params[16] as Boolean
-        val quotaGb = params[17] as Float
-        val autoSync = params[18] as Boolean
-        val meshRelay = params[19] as Boolean
-        val snackMsg = params[20] as String?
+        val isGitHubHub = params[17] as Boolean
+        val isGitHubLoadingVal = params[18] as Boolean
+        val downloadProgress = params[19] as Float
+        val latestRelease = params[20] as com.example.data.github.GitHubReleaseInfo?
+        val repoFiles = params[21] as List<com.example.data.github.GitHubFileItem>
+        val gistUrl = params[22] as String?
+        val quotaGb = params[23] as Float
+        val autoSync = params[24] as Boolean
+        val meshRelay = params[25] as Boolean
+        val snackMsg = params[26] as String?
 
         val resolved = allConflicts.filter { it.status != ConflictStatus.PENDING }
 
@@ -167,6 +191,12 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
             isCreatingNoteDialog = isCreatingNote,
             isAddPeerDialog = isAddPeer,
             isStorageSettingsDialog = isStorageSettings,
+            isGitHubHubDialog = isGitHubHub,
+            isGitHubLoading = isGitHubLoadingVal,
+            gitHubDownloadProgress = downloadProgress,
+            gitHubLatestRelease = latestRelease,
+            gitHubRepoFiles = repoFiles,
+            gitHubGistUrl = gistUrl,
             quotaLimitGb = quotaGb,
             autoSyncOnConnect = autoSync,
             meshRelayEnabled = meshRelay,
@@ -220,6 +250,110 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
 
     fun showStorageSettingsDialog(show: Boolean) {
         _isStorageSettingsDialog.value = show
+    }
+
+    fun showGitHubHubDialog(show: Boolean) {
+        _isGitHubHubDialog.value = show
+        if (!show) {
+            _gitHubGistUrl.value = null
+        }
+    }
+
+    fun downloadFromGitHub(
+        urlOrPath: String,
+        customName: String? = null,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        if (urlOrPath.isBlank()) {
+            showSnackbar("Please enter a GitHub URL or file path")
+            return
+        }
+
+        viewModelScope.launch {
+            _isGitHubLoading.value = true
+            _gitHubDownloadProgress.value = 0.05f
+            try {
+                val result = repository.downloadFromGitHub(
+                    urlOrPath = urlOrPath.trim(),
+                    customName = customName?.takeIf { it.isNotBlank() },
+                    onProgress = { progress, _, _ ->
+                        _gitHubDownloadProgress.value = progress
+                    }
+                )
+
+                _isGitHubLoading.value = false
+                _gitHubDownloadProgress.value = 1f
+
+                if (result.success) {
+                    showSnackbar("Downloaded '${result.fileName}' into Offline Vault!")
+                    onComplete(true)
+                } else {
+                    showSnackbar("Download failed: ${result.errorMessage}")
+                    onComplete(false)
+                }
+            } catch (e: Exception) {
+                _isGitHubLoading.value = false
+                showSnackbar("Error downloading from GitHub: ${e.localizedMessage}")
+                onComplete(false)
+            }
+        }
+    }
+
+    fun fetchGitHubReleases(owner: String, repo: String) {
+        viewModelScope.launch {
+            _isGitHubLoading.value = true
+            try {
+                val result = repository.fetchGitHubReleases(owner.trim(), repo.trim())
+                _isGitHubLoading.value = false
+                result.onSuccess { release ->
+                    _gitHubLatestRelease.value = release
+                    showSnackbar("Loaded latest release for $owner/$repo: ${release.tagName}")
+                }.onFailure { err ->
+                    showSnackbar("Could not load release: ${err.localizedMessage}")
+                }
+            } catch (e: Exception) {
+                _isGitHubLoading.value = false
+                showSnackbar("Error fetching releases: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun fetchGitHubContents(owner: String, repo: String, path: String = "") {
+        viewModelScope.launch {
+            _isGitHubLoading.value = true
+            try {
+                val result = repository.fetchGitHubContents(owner.trim(), repo.trim(), path.trim())
+                _isGitHubLoading.value = false
+                result.onSuccess { items ->
+                    _gitHubRepoFiles.value = items
+                    showSnackbar("Loaded ${items.size} files from $owner/$repo")
+                }.onFailure { err ->
+                    showSnackbar("Could not fetch repository tree: ${err.localizedMessage}")
+                }
+            } catch (e: Exception) {
+                _isGitHubLoading.value = false
+                showSnackbar("Error fetching repository: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun exportFileToGist(file: SyncedFile, isPublic: Boolean = false, token: String? = null) {
+        viewModelScope.launch {
+            _isGitHubLoading.value = true
+            try {
+                val result = repository.exportVaultFileToGist(file, isPublic, token)
+                _isGitHubLoading.value = false
+                result.onSuccess { gistUrl ->
+                    _gitHubGistUrl.value = gistUrl
+                    showSnackbar("Gist created: $gistUrl")
+                }.onFailure { err ->
+                    showSnackbar("Gist export failed: ${err.localizedMessage}")
+                }
+            } catch (e: Exception) {
+                _isGitHubLoading.value = false
+                showSnackbar("Error exporting Gist: ${e.localizedMessage}")
+            }
+        }
     }
 
     fun setQuotaLimitGb(gb: Float) {
