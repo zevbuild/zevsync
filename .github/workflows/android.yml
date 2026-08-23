@@ -45,7 +45,7 @@ jobs:
         cp .env app/.env 2>/dev/null || true
 
     - name: Build Android APK
-      run: ./gradlew assembleDebug --stacktrace
+      run: ./gradlew assembleDebug --stacktrace --continue
 
     - name: Upload Generated APKs
       uses: actions/upload-artifact@v4
