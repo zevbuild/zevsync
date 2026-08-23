@@ -22,34 +22,30 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
-      with:
-        cache-read-only: false
 
     - name: Ensure Executable Permissions
       run: chmod +x gradlew
 
-    - name: Restore Debug Keystore and Environment Config
+    - name: Restore Keystore and Environment Config
       run: |
         if [ -f "debug.keystore.base64" ]; then
-          base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
+          base64 -d debug.keystore.base64 > debug.keystore || true
         fi
         if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
           keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keypass android -storepass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
         fi
+        cp debug.keystore app/debug.keystore 2>/dev/null || true
         if [ ! -f ".env" ] && [ -f ".env.example" ]; then
           cp .env.example .env
         elif [ ! -f ".env" ]; then
           touch .env
         fi
-        ls -la debug.keystore
+        cp .env app/.env 2>/dev/null || true
 
     - name: Build Android APK
-      run: ./gradlew assembleDebug --stacktrace --info --no-daemon -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+      run: ./gradlew assembleDebug --stacktrace
 
     - name: Upload Generated APKs
       uses: actions/upload-artifact@v4
