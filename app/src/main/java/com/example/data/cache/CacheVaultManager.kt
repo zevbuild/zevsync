@@ -229,6 +229,20 @@ class CacheVaultManager(private val context: Context) {
         )
     }
 
+    suspend fun exportCurrentAppApk(): Triple<File, String, Long>? = withContext(Dispatchers.IO) {
+        try {
+            val sourceApkPath = context.applicationInfo.sourceDir
+            val sourceFile = File(sourceApkPath)
+            if (!sourceFile.exists() || !sourceFile.canRead()) {
+                return@withContext null
+            }
+            val apkBytes = sourceFile.readBytes()
+            saveBytesToVault("ZevSync_v1.0.apk", apkBytes)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun sanitizeFileName(name: String): String {
         return name.replace(Regex("[^a-zA-Z0-9._-]"), "_")
     }

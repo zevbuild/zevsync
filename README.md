@@ -1,5 +1,5 @@
-# SyncBeam 📡⚡
-> **Fully Offline Peer-to-Peer Bluetooth Mesh Synchronizer & Conflict-Free Cache Vault** with Direct GitHub Hub Integration.
+# ZevSync 📡⚡
+> **Fully Offline Peer-to-Peer Bluetooth Mesh Synchronizer & Conflict-Free Cache Vault** with Direct GitHub Hub & In-App APK Distribution.
 
 [![Android CI](https://github.com/actions/workflows/android.yml/badge.svg)](https://github.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -8,26 +8,29 @@
 
 ---
 
-## 🚀 Direct Download via GitHub
+## 🚀 Download & Install ZevSync APK
 
-You can download and install SyncBeam directly onto your Android device from GitHub:
+You can download and install ZevSync directly onto your Android device through multiple simple methods:
 
-### Option 1: Download Pre-Built APK from GitHub Releases (Recommended)
+### Option 1: In-App Self-Extraction & Offline Beaming (Zero Internet!)
+1. Open ZevSync on any device that already has the app.
+2. Tap the **Download APK** icon (top bar, Vault, or Storage menu).
+3. Tap **Extract APK to Local Vault** or **Share APK**.
+4. You can now beam the APK directly over Bluetooth to nearby phones or share it over Quick Share/WhatsApp without requiring any internet connection!
+
+### Option 2: Download Pre-Built APK from GitHub Releases
 1. Go to the **[Releases](../../releases)** tab of this repository.
-2. Under **Assets**, click on `SyncBeam-v1.0.0.apk` (or `app-debug.apk` / `app-release.apk`).
+2. Under **Assets**, download `ZevSync-v1.0.0.apk`.
 3. Open the downloaded APK on your Android device and tap **Install** (allow *Install Unknown Apps* if prompted).
 
-### Option 2: Download Artifacts from GitHub Actions
+### Option 3: Download Artifacts from GitHub Actions CI/CD
 1. Navigate to the **[Actions](../../actions)** tab.
 2. Select the latest successful workflow run.
-3. Scroll down to the **Artifacts** section and download `SyncBeam-debug-apk`.
+3. Scroll down to the **Artifacts** section and download `ZevSync-debug-apk`.
 
-### Option 3: In-App GitHub Direct Hub
-SyncBeam comes equipped with an internal **GitHub Direct Hub** allowing you to:
-- Directly fetch files, raw scripts, and repositories straight into your offline vault.
-- Browse repository directory trees with one tap.
-- Download latest release assets and APKs directly inside the app.
-- Export your local offline notes and documents as GitHub Gists.
+### Option 4: AI Studio Export
+1. In the AI Studio top-right toolbar, click the **Settings / Menu (⋮)**.
+2. Select **Download APK** or **Export as ZIP**.
 
 ---
 
@@ -60,8 +63,8 @@ SyncBeam comes equipped with an internal **GitHub Direct Hub** allowing you to:
 ### Clone & Build Command
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/SyncBeam.git
-cd SyncBeam
+git clone https://github.com/your-username/ZevSync.git
+cd ZevSync
 
 # Build the Debug APK
 ./gradlew assembleDebug

@@ -59,6 +59,7 @@ data class UiState(
     val isAddPeerDialog: Boolean = false,
     val isStorageSettingsDialog: Boolean = false,
     val isGitHubHubDialog: Boolean = false,
+    val isApkDownloadDialog: Boolean = false,
     val isGitHubLoading: Boolean = false,
     val gitHubDownloadProgress: Float = 0f,
     val gitHubLatestRelease: com.example.data.github.GitHubReleaseInfo? = null,
@@ -82,6 +83,7 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
     private val _isAddPeerDialog = MutableStateFlow(false)
     private val _isStorageSettingsDialog = MutableStateFlow(false)
     private val _isGitHubHubDialog = MutableStateFlow(false)
+    private val _isApkDownloadDialog = MutableStateFlow(false)
     private val _isGitHubLoading = MutableStateFlow(false)
     private val _gitHubDownloadProgress = MutableStateFlow(0f)
     private val _gitHubLatestRelease = MutableStateFlow<com.example.data.github.GitHubReleaseInfo?>(null)
@@ -111,6 +113,7 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
         _isAddPeerDialog,
         _isStorageSettingsDialog,
         _isGitHubHubDialog,
+        _isApkDownloadDialog,
         _isGitHubLoading,
         _gitHubDownloadProgress,
         _gitHubLatestRelease,
@@ -139,15 +142,16 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
         val isAddPeer = params[15] as Boolean
         val isStorageSettings = params[16] as Boolean
         val isGitHubHub = params[17] as Boolean
-        val isGitHubLoadingVal = params[18] as Boolean
-        val downloadProgress = params[19] as Float
-        val latestRelease = params[20] as com.example.data.github.GitHubReleaseInfo?
-        val repoFiles = params[21] as List<com.example.data.github.GitHubFileItem>
-        val gistUrl = params[22] as String?
-        val quotaGb = params[23] as Float
-        val autoSync = params[24] as Boolean
-        val meshRelay = params[25] as Boolean
-        val snackMsg = params[26] as String?
+        val isApkDownload = params[18] as Boolean
+        val isGitHubLoadingVal = params[19] as Boolean
+        val downloadProgress = params[20] as Float
+        val latestRelease = params[21] as com.example.data.github.GitHubReleaseInfo?
+        val repoFiles = params[22] as List<com.example.data.github.GitHubFileItem>
+        val gistUrl = params[23] as String?
+        val quotaGb = params[24] as Float
+        val autoSync = params[25] as Boolean
+        val meshRelay = params[26] as Boolean
+        val snackMsg = params[27] as String?
 
         val resolved = allConflicts.filter { it.status != ConflictStatus.PENDING }
 
@@ -192,6 +196,7 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
             isAddPeerDialog = isAddPeer,
             isStorageSettingsDialog = isStorageSettings,
             isGitHubHubDialog = isGitHubHub,
+            isApkDownloadDialog = isApkDownload,
             isGitHubLoading = isGitHubLoadingVal,
             gitHubDownloadProgress = downloadProgress,
             gitHubLatestRelease = latestRelease,
@@ -256,6 +261,22 @@ class MainViewModel(private val repository: SyncBeamRepository) : ViewModel() {
         _isGitHubHubDialog.value = show
         if (!show) {
             _gitHubGistUrl.value = null
+        }
+    }
+
+    fun showApkDownloadDialog(show: Boolean) {
+        _isApkDownloadDialog.value = show
+    }
+
+    fun exportAppApkToVault(onSuccess: (SyncedFile) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.exportCurrentAppApkToVault()
+            result.onSuccess { file ->
+                showSnackbar("Extracted ZevSync APK (${file.sizeFormatted}) into Vault!")
+                onSuccess(file)
+            }.onFailure { err ->
+                showSnackbar("Could not extract APK: ${err.localizedMessage ?: "Unknown error"}")
+            }
         }
     }
 

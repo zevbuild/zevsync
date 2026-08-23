@@ -244,10 +244,51 @@ class SyncBeamRepository(
         gitHubService.exportToGist(
             fileName = file.name,
             content = content,
-            description = "Exported from SyncBeam Mesh Vault (${file.name})",
+            description = "Exported from ZevSync Mesh Vault (${file.name})",
             isPublic = isPublic,
             token = token
         )
+    }
+
+    suspend fun exportCurrentAppApkToVault(): Result<SyncedFile> = withContext(Dispatchers.IO) {
+        try {
+            val exported = vaultManager.exportCurrentAppApk()
+                ?: return@withContext Result.failure(Exception("Could not read base APK from application info"))
+            val (savedFile, hash, size) = exported
+
+            val (newClock, newVersion) = vectorClockEngine.incrementLocal("{}")
+            val existing = fileDao.getFileByHash(hash)
+            val fileId = existing?.id ?: UUID.randomUUID().toString()
+
+            val syncedFile = SyncedFile(
+                id = fileId,
+                name = "ZevSync_v1.0.apk",
+                mimeType = "application/vnd.android.package-archive",
+                sizeBytes = size,
+                contentHash = hash,
+                localFilePath = savedFile.absolutePath,
+                versionNumber = newVersion,
+                originDeviceId = localDeviceId,
+                originDeviceName = localDeviceName,
+                lastModifiedTimestamp = System.currentTimeMillis(),
+                lamportTimestamp = 1L,
+                vectorClockJson = newClock,
+                syncStatus = SyncStatus.LOCAL_ONLY,
+                category = FileCategory.ARCHIVE,
+                textPreview = "ZevSync Android Package (APK)\nPackage: com.aistudio.zevsync\nReady for offline Bluetooth mesh distribution & installation."
+            )
+
+            fileDao.insertOrUpdate(syncedFile)
+            bluetoothEngine.logEvent(
+                "APK_EXPORT",
+                "Exported ZevSync APK",
+                "ZevSync_v1.0.apk (${syncedFile.sizeFormatted}) ready to install or beam over Bluetooth",
+                localDeviceName
+            )
+            Result.success(syncedFile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun syncFileWithPeer(file: SyncedFile, peer: PeerDevice) = withContext(Dispatchers.IO) {

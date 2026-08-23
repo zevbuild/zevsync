@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
@@ -64,6 +65,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.MainViewModel
 import com.example.ui.NavigationTab
+import com.example.ui.dialogs.ApkDownloadDialog
 import com.example.ui.dialogs.FilePreviewDialog
 import com.example.ui.dialogs.GitHubHubDialog
 import com.example.ui.screens.BluetoothRadarScreen
@@ -163,7 +165,7 @@ fun SyncBeamAppContent(viewModel: MainViewModel) {
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "SyncBeam",
+                            text = "ZevSync",
                             fontWeight = FontWeight.Black,
                             fontSize = 18.sp,
                             letterSpacing = 0.5.sp
@@ -171,6 +173,26 @@ fun SyncBeamAppContent(viewModel: MainViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.showApkDownloadDialog(true) },
+                        modifier = Modifier.testTag("download_apk_top_btn")
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF047857),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.InstallMobile,
+                                    contentDescription = "Download APK",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
                     IconButton(
                         onClick = { viewModel.showGitHubHubDialog(true) },
                         modifier = Modifier.testTag("github_hub_top_btn")
@@ -331,6 +353,23 @@ fun SyncBeamAppContent(viewModel: MainViewModel) {
             },
             onExportGist = { file, isPublic, token ->
                 viewModel.exportFileToGist(file, isPublic, token)
+            },
+            onShowSnackbar = { msg ->
+                viewModel.showSnackbar(msg)
+            }
+        )
+    }
+
+    // APK Download & Installation Guide Dialog
+    if (uiState.isApkDownloadDialog) {
+        ApkDownloadDialog(
+            uiState = uiState,
+            onDismiss = { viewModel.showApkDownloadDialog(false) },
+            onExtractApkToVault = { onSuccess ->
+                viewModel.exportAppApkToVault(onSuccess)
+            },
+            onOpenGitHubHub = {
+                viewModel.showGitHubHubDialog(true)
             },
             onShowSnackbar = { msg ->
                 viewModel.showSnackbar(msg)

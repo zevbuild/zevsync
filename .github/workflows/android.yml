@@ -1,4 +1,4 @@
-name: Android CI & Release Build
+name: ZevSync Android CI & Release Build
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build & Generate APK
+    name: Build & Generate ZevSync APK
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +32,7 @@ jobs:
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: SyncBeam-debug-apk
+        name: ZevSync-debug-apk
         path: app/build/outputs/apk/debug/app-debug.apk
         retention-days: 30
 
@@ -43,6 +43,6 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: SyncBeam-release-apk
+        name: ZevSync-release-apk
         path: app/build/outputs/apk/release/app-release-unsigned.apk
         retention-days: 30

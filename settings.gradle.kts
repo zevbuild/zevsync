@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "SyncBeam"
+rootProject.name = "ZevSync"
 
 include(":app")

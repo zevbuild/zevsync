@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Pin
@@ -245,7 +246,8 @@ fun VaultScreen(
                     hasSearch = uiState.searchQuery.isNotBlank(),
                     onAddNote = { viewModel.showCreateNoteDialog(true) },
                     onImportFile = { filePickerLauncher.launch("*/*") },
-                    onOpenGitHub = { viewModel.showGitHubHubDialog(true) }
+                    onOpenGitHub = { viewModel.showGitHubHubDialog(true) },
+                    onDownloadApk = { viewModel.showApkDownloadDialog(true) }
                 )
             } else {
                 LazyColumn(
@@ -275,6 +277,22 @@ fun VaultScreen(
                 .padding(bottom = 16.dp, end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            FloatingActionButton(
+                onClick = { viewModel.showApkDownloadDialog(true) },
+                containerColor = Color(0xFF047857),
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("download_apk_fab")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.InstallMobile,
+                    contentDescription = "Download ZevSync APK",
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
             FloatingActionButton(
                 onClick = { viewModel.showGitHubHubDialog(true) },
                 containerColor = Color(0xFF24292E),
@@ -651,7 +669,8 @@ private fun EmptyVaultView(
     hasSearch: Boolean,
     onAddNote: () -> Unit,
     onImportFile: () -> Unit,
-    onOpenGitHub: () -> Unit = {}
+    onOpenGitHub: () -> Unit = {},
+    onDownloadApk: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -714,16 +733,31 @@ private fun EmptyVaultView(
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = onOpenGitHub,
-                shape = RoundedCornerShape(12.dp),
-                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Download Directly from GitHub")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onDownloadApk,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF047857),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Download APK")
+                }
+
+                OutlinedButton(
+                    onClick = onOpenGitHub,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("GitHub Hub")
+                }
             }
         }
     }

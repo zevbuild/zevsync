@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SyncBeam</string>
+    <string name="app_name">ZevSync</string>
     <string name="title_files">Vault &amp; Cache</string>
     <string name="title_radar">Bluetooth Radar</string>
     <string name="title_transfers">Live Sync</string>
