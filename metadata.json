@@ -1,0 +1,6 @@
+{
+  "name": "SyncBeam Offline Bluetooth Sync",
+  "description": "Offline Bluetooth peer-to-peer file sharing, automatic cache synchronization, vector-clock conflict resolution, and live multi-device storage mesh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
