@@ -3,10 +3,20 @@ name: ZevSync Android CI & Release Build
 on:
   push:
     branches: [ "main", "master" ]
-    tags: [ "v*" ]
+    tags: [ "v*", "*v*", "*apk*", "*release*" ]
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish as GitHub Release'
+        required: false
+        type: boolean
+        default: false
+      tag_name:
+        description: 'Release Tag name (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
 
 jobs:
   build:
@@ -29,44 +39,72 @@ jobs:
     - name: Ensure Executable Permissions
       run: chmod +x gradlew
 
-    - name: Prepare Configuration
+    - name: Prepare Keystore & Configuration
       run: |
+        # Ensure .env exists
         if [ ! -f ".env" ] && [ -f ".env.example" ]; then
           cp .env.example .env
         elif [ ! -f ".env" ]; then
           touch .env
         fi
 
+        # Restore debug.keystore if base64 file exists
+        if [ -f "debug.keystore.base64" ]; then
+          echo "Decoding debug.keystore from base64..."
+          base64 -d debug.keystore.base64 > debug.keystore
+        fi
+
+        # Generate debug keystore if not found
+        if [ ! -f "debug.keystore" ]; then
+          echo "Generating fallback debug.keystore..."
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        fi
+
+        # If custom release keystore secret is supplied, decode it
+        if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+          echo "Decoding custom release keystore from secrets..."
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-upload-key.jks
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
+          echo "STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+        fi
+
     - name: Build Android Debug APK
-      run: ./gradlew assembleDebug --stacktrace
+      run: ./gradlew assembleDebug --stacktrace --no-daemon
 
     - name: Build Android Release APK
-      if: startsWith(github.ref, 'refs/tags/')
-      run: ./gradlew assembleRelease --stacktrace
+      run: ./gradlew assembleRelease --stacktrace --no-daemon
 
-    - name: Upload Generated APKs (Debug)
+    - name: Organize APK Artifacts
+      run: |
+        mkdir -p build-apks/debug build-apks/release
+        find app/build/outputs/apk/debug -name "*.apk" -exec cp {} build-apks/debug/ZevSync-debug.apk \;
+        find app/build/outputs/apk/release -name "*.apk" -exec cp {} build-apks/release/ZevSync-release.apk \;
+        echo "=== Generated APK Files ==="
+        ls -lh build-apks/debug/ build-apks/release/
+
+    - name: Upload Debug APK Artifact
       uses: actions/upload-artifact@v4
-      if: always()
       with:
         name: ZevSync-debug-apk
-        path: app/build/outputs/apk/debug/**/*.apk
-        if-no-files-found: warn
+        path: build-apks/debug/*.apk
+        if-no-files-found: error
         retention-days: 30
 
-    - name: Upload Generated APKs (Release)
+    - name: Upload Release APK Artifact
       uses: actions/upload-artifact@v4
-      if: startsWith(github.ref, 'refs/tags/') && always()
       with:
         name: ZevSync-release-apk
-        path: app/build/outputs/apk/release/**/*.apk
-        if-no-files-found: warn
+        path: build-apks/release/*.apk
+        if-no-files-found: error
         retention-days: 90
 
   release:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
 
     permissions:
       contents: write
@@ -75,16 +113,26 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Download Release APK
+    - name: Download Release APK Artifact
       uses: actions/download-artifact@v4
       with:
         name: ZevSync-release-apk
-        path: ./apk-artifacts
+        path: ./release-apk
 
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+    - name: Download Debug APK Artifact
+      uses: actions/download-artifact@v4
       with:
-        files: ./apk-artifacts/**/*.apk
+        name: ZevSync-debug-apk
+        path: ./debug-apk
+
+    - name: Publish GitHub Release with APKs
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name || inputs.tag_name }}
+        name: ZevSync ${{ github.ref_name || inputs.tag_name }}
+        files: |
+          ./release-apk/*.apk
+          ./debug-apk/*.apk
         draft: false
         prerelease: false
         generate_release_notes: true
