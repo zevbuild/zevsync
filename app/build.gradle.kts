@@ -56,7 +56,7 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Default standard debug signing configuration built into AGP
+      signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
   compileOptions {

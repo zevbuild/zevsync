@@ -1,110 +1,95 @@
-# Real Device Discovery & Web Bluetooth Mesh Implementation Plan
+# Replace CI Workflow with Web-Only Build & PWA Offline Engine
 
-Replace all simulated and hardcoded fake devices with actual hardware discovery via the native Web Bluetooth API (`navigator.bluetooth`), accompanied by a real browser-to-browser peer-to-peer fallback mesh (BroadcastChannel + WebRTC/local signaling) and clean empty-state onboarding.
+Transform the repository into a 100% reliable, Web-only offline application by replacing the failing Android CI workflow with a streamlined GitHub Actions Web CI pipeline and enabling full Progressive Web App (PWA) offline capabilities.
 
 > [!IMPORTANT]
-> **Confirmed Decisions from Phase 1:**
-> - **Primary Discovery Method**: Native Web Bluetooth API (`navigator.bluetooth.requestDevice`) to discover, pair, and connect with actual physical nearby Bluetooth devices.
-> - **Unsupported Browser Fallback**: Real multi-window / multi-device peer-to-peer mesh fallback (via BroadcastChannel & local peer signaling) with clear status prompts when Web Bluetooth is not supported or permission is denied.
+> **Confirmed User Decisions:**
+> - **CI Target**: Replace `.github/workflows/android.yml` with a Web-only build, lint, and test workflow.
+> - **Execution Mode**: 100% web-native with complete offline standalone capabilities (no Android Gradle or keystore requirements).
 
 ---
 
 ## 1. Overview & Core Concept
 
-Currently, the application displays hardcoded mock devices ("Pixel 9 Pro", "Galaxy Tab S9") and injects a simulated "OnePlus 12" during scans. This update completely eradicates simulated devices:
+The repository originally included Android native Gradle configs (`.github/workflows/android.yml`, `app/`, `gradlew`) that fail in GitHub Actions due to missing keystores, Android SDK version mismatches, and build dependencies.
 
-- **True Hardware Bluetooth**: Invokes the browser's native Bluetooth pairing dialog to search for real nearby Bluetooth devices (smartphones, peripherals, BLE nodes, tablets).
-- **Zero Mock Data Policy**: Device lists start empty. Only authentic devices paired by the user or discovered via real local channels appear.
-- **Resilient Fallback**: In browsers without Web Bluetooth (or when Bluetooth is turned off), the app seamlessly activates a real peer-to-peer network across browser tabs, windows, and local sessions with live heartbeat pinging and actual file transfer capabilities.
+This implementation delivers:
+1. **Streamlined Web GitHub Actions Workflow (`.github/workflows/web.yml`)**:
+   - Automated testing on Node.js 22.
+   - Executes dependency installation, TypeScript type checking (`tsc --noEmit`), and production compilation (`vite build`).
+   - Uploads static build artifacts (`dist/`) ready for deployment (GitHub Pages, hosting, or release distribution).
+2. **100% Offline Progressive Web App (PWA)**:
+   - Offline Service Worker caching all static assets (HTML, CSS, JS, fonts, icons) so the app works seamlessly with zero internet connection.
+   - Compliant Web App Manifest (`manifest.json`) for installing ZevSync directly to mobile home screens and desktops as a standalone app.
+   - In-app install banner/button with iOS Safari and Android/Desktop support.
+3. **Repository Cleanliness**:
+   - Delete obsolete Android Gradle artifacts (`app/`, `build.gradle.kts`, `settings.gradle.kts`, `gradle/`, `gradlew`, `android.yml`) that cause CI failures and clutter.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-### Key User Flows
-
 ```
-[ Radar Screen ] 
-       │
-       ├── User clicks "Scan for Bluetooth Devices"
-       │       │
-       │       ▼
-       │  [ Native Web Bluetooth Picker ] ──► User picks real hardware device
-       │                                             │
-       │                                             ▼
-       │                                    Device added to Mesh
-       │                                    (Real name, ID, GATT connection)
-       │
-       └── If Web Bluetooth unavailable/denied:
-               │
-               ▼
-          [ Peer-to-Peer Fallback Banner ]
-               │
-               ├── Generates live shareable Peer Link / QR
-               └── Automatically connects other open ZevSync instances (Tabs / Windows)
+┌─────────────────────────────────────────────────────────────┐
+│ [ZevSync Brand]        [Install App] [Offline Mesh] [Hub]   │ ◄ Header with PWA Install
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │  Bluetooth & P2P Mesh                               │   │
+│   │  Local node: Mac Workstation · Real hardware P2P    │   │
+│   │  [ MESH ONLINE ] [ 100% OFFLINE CACHED ]            │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Visual & Component Specifications
-
-- **Device Radar Screen (`BluetoothRadarScreen.tsx`)**:
-  - **Zero-State / Empty Mesh**: Clean informative illustration and text: *"No devices connected yet. Scan for nearby Bluetooth hardware or open ZevSync on another tab or device to build your mesh."*
-  - **Hardware Status Badge**: Quiet unboxed indicator showing Web Bluetooth availability (`Web Bluetooth Supported` or `P2P Mesh Mode Active`).
-  - **Scan Button**: Prominent action triggering `navigator.bluetooth.requestDevice()`.
-  - **Device Cards**: Display authentic device name, hardware ID, connection state (`Connected` / `Disconnected`), and disconnect action.
+- **In-App PWA Install Trigger**:
+  - Automatically detects whether the app is installable on Chromium / Android / Desktop or iOS Safari.
+  - Renders a clean action in the header (`Install App`) that triggers the native OS installation dialog.
+  - Automatically hides once installed in standalone mode.
+- **Offline Reliability Badge**:
+  - Visual reassurance that cache storage and mesh networking function completely offline without internet connectivity.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Real Web Bluetooth API (`navigator.bluetooth`)**:
-  - *Chosen Approach*: Request device using `acceptAllDevices: true` and standard optional services (`battery_service`, `device_information`, `generic_access`) to maximize compatibility with phones, tablets, and peripherals.
-  - *Why*: Allows actual discovery of physical Bluetooth hardware directly from web browsers without native APK installation.
-- **Cross-Session P2P Mesh Fallback**:
-  - *Chosen Approach*: Use `BroadcastChannel('zevsync_mesh_bus')` with synchronized local peer heartbeats.
-  - *Why*: Enables instant testing and real multi-device synchronization between two browser windows or tabs on the same machine or local LAN without needing external servers.
-- **Eradication of Mock Artifacts**:
-  - *Chosen Approach*: Remove hardcoded initial peer array, mock scan timer additions, and simulated mock conflicts with fictitious nodes.
-  - *Why*: Directly solves the user's report of fake devices.
+- **Web-Only CI Workflow**:
+  - *Chosen Approach*: Replace `android.yml` with a clean `web.yml` running Node.js 22, `npm ci`, `npm run lint`, and `npm run build`.
+  - *Why*: Directly eliminates Gradle compilation errors, missing keystore secret failures, and 15+ minute Android emulator runs in GitHub Actions. Web build takes under 20 seconds.
+- **Service Worker & Manifest**:
+  - *Chosen Approach*: Configure Web App Manifest (`/manifest.json`), service worker registration (`/sw.js`), and install hook (`usePWAInstall.ts`).
+  - *Why*: Allows users on Android, iOS, Windows, Mac, and Linux to install ZevSync as a native-feeling standalone app directly from their browser with full offline caching.
+- **Purge Obsolete Android Files**:
+  - *Chosen Approach*: Remove `app/`, `gradle/`, `gradlew`, and `settings.gradle.kts`.
+  - *Why*: Eliminates false-positive CI triggers and avoids confusion between Android native and Web architectures.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## 4. Technical Architecture & CI Pipeline
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│                   ZevSync App Context                  │
-└───────────────────────────┬────────────────────────────┘
-                            │
-            ┌───────────────┴───────────────┐
-            ▼                               ▼
-┌────────────────────────┐      ┌────────────────────────┐
-│   Web Bluetooth API    │      │  Real P2P Mesh Engine  │
-│  (navigator.bluetooth) │      │   (BroadcastChannel)   │
-├────────────────────────┤      ├────────────────────────┤
-│ • requestDevice()      │      │ • Node Heartbeat Ping  │
-│ • gatt.connect()       │      │ • Peer-to-Peer Packets │
-│ • gattserverdisconnect │      │ • Multi-Window Sync    │
-└────────────────────────┘      └────────────────────────┘
-            │                               │
-            └───────────────┬───────────────┘
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│               Unified Discovered Peer List             │
-│            (Only 100% Real Connected Nodes)            │
+│            GitHub Actions: .github/workflows/web.yml   │
+├────────────────────────────────────────────────────────┤
+│ 1. Checkout (actions/checkout@v4)                      │
+│ 2. Setup Node.js 22 (actions/setup-node@v4)           │
+│ 3. Install Dependencies (npm ci)                       │
+│ 4. Type Check & Lint (npm run lint)                   │
+│ 5. Production Build (npm run build)                   │
+│ 6. Upload Artifacts (actions/upload-artifact@v4)       │
 └────────────────────────────────────────────────────────┘
 ```
 
-### Key Changes by Module
+### Key Changes by File:
 
-1. **`src/services/webBluetoothService.ts` (New)**:
-   - Encapsulates `navigator.bluetooth` capability checks, `requestDevice()`, GATT server connection management, and disconnection listeners.
-2. **`src/services/p2pMeshService.ts` (New)**:
-   - BroadcastChannel-based real-time communication bus for multi-device/multi-window synchronization without external infrastructure.
-3. **`src/context/SyncBeamContext.tsx`**:
-   - Initialize `discoveredPeers` as empty `[]`.
-   - Wire `startBluetoothScan` to `webBluetoothService.scanAndConnect()`.
-   - Integrate P2P fallback bus to detect and sync with real local peer sessions.
-   - Clean up initial mock conflicts that referenced fictitious devices.
-4. **`src/components/BluetoothRadarScreen.tsx`**:
-   - Add native Web Bluetooth capability status notice.
-   - Implement real connection controls and clear empty states.
+1. **`/.github/workflows/web.yml`**:
+   - Modern, reliable CI pipeline for pushes and PRs on `main`/`master` and tags.
+2. **`/.github/workflows/android.yml`**:
+   - Deleted to resolve the CI failure.
+3. **`/public/manifest.json` & `/public/sw.js`**:
+   - Web App Manifest and offline caching service worker for complete offline functionality.
+4. **`/src/hooks/usePWAInstall.ts` & `/src/components/Header.tsx`**:
+   - In-app install affordance and offline status indication.
+5. **Clean up Android files**:
+   - Remove `app/`, `build.gradle.kts`, `settings.gradle.kts`, `gradle/`, `gradlew`, `gradlew.bat`.

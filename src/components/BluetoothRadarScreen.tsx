@@ -37,6 +37,10 @@ export const BluetoothRadarScreen: React.FC = () => {
     isAddPeerDialog,
     showAddPeerDialog,
     localDeviceName,
+    selectTab,
+    isPhoneProximityConnected,
+    proximityDistanceMeters,
+    connectedPhoneName,
   } = useSyncBeam();
 
   const [peerNameInput, setPeerNameInput] = useState('');
@@ -137,6 +141,34 @@ export const BluetoothRadarScreen: React.FC = () => {
             <span>Open 2nd Node in New Window</span>
           </button>
         </div>
+      </div>
+
+      {/* Phone Storage Access Fast-Link Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#111D3D] to-[#1C2A4F] border border-[#1E3A8A] p-4 shadow-lg flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-[#00D2BA]/20 text-[#53EFD8] border border-[#53EFD8]/40 flex items-center justify-center shrink-0">
+            <Smartphone className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-bold text-sm text-white truncate">
+              {connectedPhoneName} Storage Bridge
+            </h3>
+            <p className="text-xs text-slate-300 truncate">
+              {isPhoneProximityConnected
+                ? `In Proximity (~${proximityDistanceMeters}m away) · Direct access to DCIM, Downloads & all folders`
+                : 'Connect or bring phone near laptop to browse all phone files & folders'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => selectTab('PHONE_EXPLORER')}
+          className="py-2 px-3.5 rounded-xl text-xs font-bold bg-[#53EFD8] hover:bg-[#3be5cc] text-slate-950 flex items-center gap-1.5 transition-all shadow-md shrink-0 active:scale-95"
+        >
+          <span>Explore Phone</span>
+          <ArrowUpRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Discovered & Paired Peers Section */}

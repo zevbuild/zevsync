@@ -150,7 +150,22 @@ export interface StorageBreakdown {
 
 export type FileSortOrder = 'DATE_DESC' | 'DATE_ASC' | 'NAME_ASC' | 'SIZE_DESC';
 
-export type NavigationTab = 'VAULT' | 'RADAR' | 'LIVE_SYNC' | 'CONFLICTS' | 'STORAGE';
+export type NavigationTab = 'VAULT' | 'PHONE_EXPLORER' | 'RADAR' | 'LIVE_SYNC' | 'CONFLICTS' | 'STORAGE';
+
+export interface PhoneFileItem {
+  id: string;
+  name: string;
+  path: string;
+  parentPath: string;
+  isDirectory: boolean;
+  sizeBytes: number;
+  mimeType: string;
+  modifiedTimestamp: number;
+  contentSnippet?: string;
+  downloadUrl?: string;
+  realBlob?: Blob | File;
+  previewUrl?: string;
+}
 
 export type ConflictResolutionChoice =
   | 'KEEP_LOCAL_WINNER'

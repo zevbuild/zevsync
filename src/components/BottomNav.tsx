@@ -2,6 +2,7 @@ import React from 'react';
 import { useSyncBeam } from '../context/SyncBeamContext';
 import { NavigationTab } from '../types/models';
 import {
+  Smartphone,
   Folder,
   Radio,
   RefreshCw,
@@ -20,11 +21,13 @@ interface TabItem {
 
 const TABS: TabItem[] = [
   {
-    id: 'VAULT',
-    label: 'Vault',
-    testTag: 'nav_vault',
-    icon: Folder,
-    getBadgeCount: () => 0,
+    id: 'PHONE_EXPLORER',
+    label: 'Phone Files',
+    testTag: 'nav_phone_explorer',
+    icon: Smartphone,
+    getBadgeCount: (ui) =>
+      ui.isPhoneProximityConnected ? ui.phoneFiles.filter((f) => !f.isDirectory).length : 0,
+    badgeColor: 'bg-[#10B981] text-black',
   },
   {
     id: 'RADAR',
@@ -33,6 +36,13 @@ const TABS: TabItem[] = [
     icon: Radio,
     getBadgeCount: (ui) => ui.discoveredPeers.filter((p) => p.isConnected).length,
     badgeColor: 'bg-[#53EFD8] text-black',
+  },
+  {
+    id: 'VAULT',
+    label: 'Vault',
+    testTag: 'nav_vault',
+    icon: Folder,
+    getBadgeCount: () => 0,
   },
   {
     id: 'LIVE_SYNC',
@@ -52,7 +62,7 @@ const TABS: TabItem[] = [
   },
   {
     id: 'STORAGE',
-    label: 'Storage & Mesh',
+    label: 'Storage',
     testTag: 'nav_storage',
     icon: HardDrive,
     getBadgeCount: () => 0,
@@ -64,8 +74,8 @@ export const BottomNav: React.FC = () => {
   const { currentTab, selectTab } = syncBeam;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#111D3D]/95 backdrop-blur-lg border-t border-[#1E3A8A] px-2 py-1 shadow-2xl">
-      <div className="max-w-md mx-auto grid grid-cols-5 gap-1">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#111D3D]/95 backdrop-blur-lg border-t border-[#1E3A8A] px-1.5 py-1 shadow-2xl">
+      <div className="max-w-lg mx-auto grid grid-cols-6 gap-1">
         {TABS.map((tab) => {
           const isSelected = currentTab === tab.id;
           const Icon = tab.icon;

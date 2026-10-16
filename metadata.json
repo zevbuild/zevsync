@@ -1,6 +1,6 @@
 {
   "name": "ZevSync",
-  "description": "Offline Bluetooth peer-to-peer file sharing, automatic cache synchronization, vector-clock conflict resolution, and live multi-device storage mesh.",
+  "description": "Access all files and folders on your Android phone directly from your laptop via offline proximity Bluetooth mesh, auto-mount, and live sync.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

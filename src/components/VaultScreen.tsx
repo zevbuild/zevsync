@@ -20,6 +20,7 @@ import {
   HardDrive,
   X,
   Share2,
+  Smartphone,
 } from 'lucide-react';
 
 const CATEGORIES: { id: FileCategory; label: string }[] = [
@@ -105,14 +106,26 @@ export const VaultScreen: React.FC = () => {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => selectTab('RADAR')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#172554] hover:bg-[#1E3A8A] border border-[#1E3A8A] text-xs font-semibold text-sky-300 transition-all active:scale-95"
-        >
-          <Radio className="w-3.5 h-3.5 text-[#53EFD8]" />
-          <span>{activePeersCount} Connected</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => selectTab('PHONE_EXPLORER')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#047857]/80 hover:bg-[#047857] border border-[#10B981]/40 text-xs font-semibold text-white transition-all active:scale-95 shadow-sm"
+            title="Browse all files and folders on your phone"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-[#53EFD8]" />
+            <span>Phone Storage</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectTab('RADAR')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#172554] hover:bg-[#1E3A8A] border border-[#1E3A8A] text-xs font-semibold text-sky-300 transition-all active:scale-95"
+          >
+            <Radio className="w-3.5 h-3.5 text-[#53EFD8]" />
+            <span>{activePeersCount} Connected</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar & Sort Menu */}

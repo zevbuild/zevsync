@@ -3,6 +3,7 @@ import { SyncBeamProvider, useSyncBeam } from './context/SyncBeamContext';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { VaultScreen } from './components/VaultScreen';
+import { PhoneStorageExplorer } from './components/PhoneStorageExplorer';
 import { BluetoothRadarScreen } from './components/BluetoothRadarScreen';
 import { LiveSyncScreen } from './components/LiveSyncScreen';
 import { ConflictsScreen } from './components/ConflictsScreen';
@@ -40,6 +41,7 @@ const AppContent: React.FC = () => {
       <Header />
 
       <main className="flex-1 w-full max-w-4xl mx-auto pt-2">
+        {currentTab === 'PHONE_EXPLORER' && <PhoneStorageExplorer />}
         {currentTab === 'VAULT' && <VaultScreen />}
         {currentTab === 'RADAR' && <BluetoothRadarScreen />}
         {currentTab === 'LIVE_SYNC' && <LiveSyncScreen />}

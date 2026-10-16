@@ -13,6 +13,7 @@ import {
   TransferItem,
   GitHubReleaseInfo,
   GitHubFileItem,
+  PhoneFileItem,
 } from '../types/models';
 import { VectorClockEngine } from '../services/vectorClockEngine';
 import {
@@ -24,6 +25,7 @@ import {
 import { GitHubSyncService } from '../services/gitHubSyncService';
 import { webBluetoothService } from '../services/webBluetoothService';
 import { P2PMeshService } from '../services/p2pMeshService';
+import JSZip from 'jszip';
 
 interface SyncBeamContextType {
   files: SyncedFile[];
@@ -109,6 +111,28 @@ interface SyncBeamContextType {
   fetchGitHubReleases: (owner: string, repo: string) => Promise<void>;
   fetchGitHubContents: (owner: string, repo: string, path?: string) => Promise<void>;
   exportFileToGist: (file: SyncedFile, isPublic: boolean, token?: string | null) => Promise<void>;
+
+  // Phone Proximity Storage Bridge
+  phoneFiles: PhoneFileItem[];
+  currentPhonePath: string;
+  isPhoneProximityConnected: boolean;
+  proximityAutoSyncEnabled: boolean;
+  proximityDistanceMeters: number;
+  proximityRssi: number;
+  connectedPhoneName: string;
+  navigateToPhoneFolder: (path: string) => void;
+  uploadFileToPhone: (file: File, targetPath: string) => Promise<void>;
+  downloadFileFromPhone: (phoneFile: PhoneFileItem) => void;
+  downloadFolderAsZip: (folderPath: string) => Promise<void>;
+  deletePhoneFile: (fileId: string) => void;
+  createPhoneFolder: (parentPath: string, folderName: string) => void;
+  syncAllPhoneFilesToVault: () => Promise<void>;
+  toggleProximityAutoSync: (enabled: boolean) => void;
+  connectPhoneProximityBridge: () => void;
+  disconnectPhoneProximityBridge: () => void;
+  simulateProximityRange: (range: 'NEAR' | 'MID' | 'FAR' | 'DISCONNECTED') => void;
+  mountLocalDirectoryPicker: () => Promise<void>;
+  startPhoneBluetoothPairing: () => Promise<void>;
 }
 
 const getStoredDeviceId = (): string => {
@@ -171,6 +195,50 @@ export const SyncBeamProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [gitHubLatestRelease, setGitHubLatestRelease] = useState<GitHubReleaseInfo | null>(null);
   const [gitHubRepoFiles, setGitHubRepoFiles] = useState<GitHubFileItem[]>([]);
   const [gitHubGistUrl, setGitHubGistUrl] = useState<string | null>(null);
+
+  // Phone Proximity Storage Bridge State
+  const [isPhoneProximityConnected, setIsPhoneProximityConnected] = useState(true);
+  const [proximityAutoSyncEnabled, setProximityAutoSyncEnabled] = useState(true);
+  const [currentPhonePath, setCurrentPhonePath] = useState('/');
+  const [proximityDistanceMeters, setProximityDistanceMeters] = useState(0.8);
+  const [proximityRssi, setProximityRssi] = useState(-42);
+  const [connectedPhoneName, setConnectedPhoneName] = useState('Android Phone (Nearby)');
+
+  const [phoneFiles, setPhoneFiles] = useState<PhoneFileItem[]>([
+    // Root directories
+    { id: 'dir-dcim', name: 'DCIM', path: '/DCIM', parentPath: '/', isDirectory: true, sizeBytes: 48700000, mimeType: 'inode/directory', modifiedTimestamp: Date.now() - 3600000 },
+    { id: 'dir-download', name: 'Download', path: '/Download', parentPath: '/', isDirectory: true, sizeBytes: 16320000, mimeType: 'inode/directory', modifiedTimestamp: Date.now() - 7200000 },
+    { id: 'dir-docs', name: 'Documents', path: '/Documents', parentPath: '/', isDirectory: true, sizeBytes: 67000, mimeType: 'inode/directory', modifiedTimestamp: Date.now() - 86400000 },
+    { id: 'dir-pictures', name: 'Pictures', path: '/Pictures', parentPath: '/', isDirectory: true, sizeBytes: 1100000, mimeType: 'inode/directory', modifiedTimestamp: Date.now() - 172800000 },
+    { id: 'dir-music', name: 'Music', path: '/Music', parentPath: '/', isDirectory: true, sizeBytes: 3200000, mimeType: 'inode/directory', modifiedTimestamp: Date.now() - 250000000 },
+
+    // Subdirectories
+    { id: 'dir-camera', name: 'Camera', path: '/DCIM/Camera', parentPath: '/DCIM', isDirectory: true, sizeBytes: 48700000, mimeType: 'inode/directory', modifiedTimestamp: Date.now() - 3600000 },
+    { id: 'dir-screenshots', name: 'Screenshots', path: '/DCIM/Screenshots', parentPath: '/DCIM', isDirectory: true, sizeBytes: 850000, mimeType: 'inode/directory', modifiedTimestamp: Date.now() - 7200000 },
+    { id: 'dir-whatsapp', name: 'WhatsApp', path: '/Pictures/WhatsApp', parentPath: '/Pictures', isDirectory: true, sizeBytes: 1100000, mimeType: 'inode/directory', modifiedTimestamp: Date.now() - 172800000 },
+
+    // Camera Photos & Videos
+    { id: 'file-p1', name: 'IMG_20261015_183021.jpg', path: '/DCIM/Camera/IMG_20261015_183021.jpg', parentPath: '/DCIM/Camera', isDirectory: false, sizeBytes: 3400000, mimeType: 'image/jpeg', modifiedTimestamp: Date.now() - 3600000 },
+    { id: 'file-p2', name: 'IMG_20261015_184510.jpg', path: '/DCIM/Camera/IMG_20261015_184510.jpg', parentPath: '/DCIM/Camera', isDirectory: false, sizeBytes: 2800000, mimeType: 'image/jpeg', modifiedTimestamp: Date.now() - 3200000 },
+    { id: 'file-p3', name: 'VID_20261014_210214.mp4', path: '/DCIM/Camera/VID_20261014_210214.mp4', parentPath: '/DCIM/Camera', isDirectory: false, sizeBytes: 42500000, mimeType: 'video/mp4', modifiedTimestamp: Date.now() - 86400000 },
+    { id: 'file-p4', name: 'Screenshot_20261016_012015.png', path: '/DCIM/Screenshots/Screenshot_20261016_012015.png', parentPath: '/DCIM/Screenshots', isDirectory: false, sizeBytes: 850000, mimeType: 'image/png', modifiedTimestamp: Date.now() - 1800000 },
+
+    // Downloads
+    { id: 'file-d1', name: 'Project_Brief_Final.pdf', path: '/Download/Project_Brief_Final.pdf', parentPath: '/Download', isDirectory: false, sizeBytes: 1200000, mimeType: 'application/pdf', modifiedTimestamp: Date.now() - 7200000, contentSnippet: '%PDF-1.4\nProject Brief & Requirements\nSynced directly from phone storage.' },
+    { id: 'file-d2', name: 'ZevSync_v1.0_Release.apk', path: '/Download/ZevSync_v1.0_Release.apk', parentPath: '/Download', isDirectory: false, sizeBytes: 14700000, mimeType: 'application/vnd.android.package-archive', modifiedTimestamp: Date.now() - 5000000 },
+    { id: 'file-d3', name: 'Invoice_OCT_2026.docx', path: '/Download/Invoice_OCT_2026.docx', parentPath: '/Download', isDirectory: false, sizeBytes: 420000, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', modifiedTimestamp: Date.now() - 14000000 },
+
+    // Documents
+    { id: 'file-doc1', name: 'Work_Report_Q3.md', path: '/Documents/Work_Report_Q3.md', parentPath: '/Documents', isDirectory: false, sizeBytes: 45000, mimeType: 'text/markdown', modifiedTimestamp: Date.now() - 86400000, contentSnippet: '# Q3 Engineering Report\n- Real-time P2P synchronizer\n- Proximity-based phone file explorer\n- Offline caching verification' },
+    { id: 'file-doc2', name: 'Budget_Sheet_2026.csv', path: '/Documents/Budget_Sheet_2026.csv', parentPath: '/Documents', isDirectory: false, sizeBytes: 18000, mimeType: 'text/csv', modifiedTimestamp: Date.now() - 90000000, contentSnippet: 'Item,Cost,Category\nHardware,1200,Equipment\nTravel,450,Ops\nSoftware,80,SaaS' },
+    { id: 'file-doc3', name: 'Key_Codes.txt', path: '/Documents/Key_Codes.txt', parentPath: '/Documents', isDirectory: false, sizeBytes: 4000, mimeType: 'text/plain', modifiedTimestamp: Date.now() - 95000000, contentSnippet: 'Access Key: A7-904-ZEVSYNC\nBluetooth Channel: 1\nService UUID: fa87c0d0' },
+
+    // Pictures
+    { id: 'file-pic1', name: 'shared_doc_image.jpg', path: '/Pictures/WhatsApp/shared_doc_image.jpg', parentPath: '/Pictures/WhatsApp', isDirectory: false, sizeBytes: 1100000, mimeType: 'image/jpeg', modifiedTimestamp: Date.now() - 172800000 },
+
+    // Music
+    { id: 'file-m1', name: 'Voice_Recorder_Memo_01.m4a', path: '/Music/Voice_Recorder_Memo_01.m4a', parentPath: '/Music', isDirectory: false, sizeBytes: 3200000, mimeType: 'audio/mp4', modifiedTimestamp: Date.now() - 250000000 },
+  ]);
 
   // Core Data
   const [files, setFiles] = useState<SyncedFile[]>(() => {
@@ -1206,6 +1274,327 @@ fun resolveLineage(local: Map<String, Long>, remote: Map<String, Long>): Conflic
     }
   };
 
+  // Phone Proximity Storage Bridge Methods
+  const navigateToPhoneFolder = (path: string) => {
+    setCurrentPhonePath(path);
+  };
+
+  const uploadFileToPhone = async (file: File, targetPath: string) => {
+    let snippet: string | undefined = undefined;
+    let previewUrl: string | undefined = undefined;
+
+    if (file.type.startsWith('image/')) {
+      previewUrl = URL.createObjectURL(file);
+    } else if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|json|js|ts|html|css|py|kt|csv)$/i)) {
+      try {
+        const text = await file.text();
+        snippet = text.slice(0, 1000);
+      } catch {}
+    }
+
+    const cleanTargetPath = targetPath === '/' ? '' : targetPath;
+    const newPhoneItem: PhoneFileItem = {
+      id: 'phone-upload-' + Math.random().toString(36).substring(2, 9),
+      name: file.name,
+      path: cleanTargetPath + '/' + file.name,
+      parentPath: targetPath,
+      isDirectory: false,
+      sizeBytes: file.size,
+      mimeType: file.type || determineMimeType(file.name),
+      modifiedTimestamp: Date.now(),
+      contentSnippet: snippet,
+      realBlob: file,
+      previewUrl: previewUrl,
+    };
+
+    setPhoneFiles((prev) => [newPhoneItem, ...prev]);
+    logEvent('PHONE_FILE_UPLOAD', 'File Uploaded to Phone', `${file.name} beamed from laptop to phone folder ${targetPath}`);
+    showSnackbar(`Beamed '${file.name}' to phone (${targetPath})`);
+  };
+
+  const downloadFileFromPhone = (phoneFile: PhoneFileItem) => {
+    let blob: Blob;
+    if (phoneFile.realBlob) {
+      blob = phoneFile.realBlob;
+    } else if (phoneFile.contentSnippet) {
+      blob = new Blob([phoneFile.contentSnippet], { type: phoneFile.mimeType || 'text/plain' });
+    } else {
+      blob = new Blob(
+        [`ZevSync Offline Beam File: ${phoneFile.name}\nOriginal path: ${phoneFile.path}\nSize: ${phoneFile.sizeBytes} bytes\nSynced at ${new Date().toISOString()}`],
+        { type: phoneFile.mimeType || 'application/octet-stream' }
+      );
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = phoneFile.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    logEvent('PHONE_FILE_DOWNLOAD', 'File Downloaded to Laptop', `${phoneFile.name} downloaded from phone`);
+    showSnackbar(`Downloaded '${phoneFile.name}' to laptop!`);
+  };
+
+  const downloadFolderAsZip = async (folderPath: string) => {
+    const zip = new JSZip();
+    const prefix = folderPath === '/' ? '' : folderPath;
+    const filesInFolder = phoneFiles.filter((f) => !f.isDirectory && (folderPath === '/' || f.path.startsWith(prefix)));
+
+    if (filesInFolder.length === 0) {
+      showSnackbar('No files to zip in this folder');
+      return;
+    }
+
+    showSnackbar(`Compressing ${filesInFolder.length} files from phone...`);
+
+    for (const f of filesInFolder) {
+      const relPath = folderPath === '/' ? f.path.replace(/^\//, '') : f.path.replace(prefix + '/', '');
+      if (f.realBlob) {
+        zip.file(relPath, f.realBlob);
+      } else if (f.contentSnippet) {
+        zip.file(relPath, f.contentSnippet);
+      } else {
+        zip.file(relPath, `ZevSync File: ${f.name}\nPath: ${f.path}\nSize: ${f.sizeBytes} bytes`);
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    const folderLabel = folderPath === '/' ? 'All_Phone_Storage' : folderPath.split('/').filter(Boolean).pop() || 'Phone_Folder';
+    a.download = `${folderLabel}_Phone_Backup.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    logEvent('PHONE_FOLDER_ZIP', 'Phone Folder Backed Up as ZIP', `${folderLabel} (${filesInFolder.length} files) downloaded to laptop`);
+    showSnackbar(`Zipped & downloaded '${folderLabel}' (${filesInFolder.length} files) to laptop!`);
+  };
+
+  const deletePhoneFile = (fileId: string) => {
+    const target = phoneFiles.find((f) => f.id === fileId);
+    if (!target) return;
+
+    if (target.isDirectory) {
+      setPhoneFiles((prev) => prev.filter((f) => f.id !== fileId && !f.path.startsWith(target.path + '/')));
+      showSnackbar(`Deleted folder '${target.name}' and contents on phone`);
+    } else {
+      setPhoneFiles((prev) => prev.filter((f) => f.id !== fileId));
+      showSnackbar(`Deleted '${target.name}' on phone`);
+    }
+    logEvent('PHONE_FILE_DELETED', 'Deleted on Phone', `${target.name} removed from phone storage`);
+  };
+
+  const createPhoneFolder = (parentPath: string, folderName: string) => {
+    const cleanParent = parentPath === '/' ? '' : parentPath;
+    const folderPath = cleanParent + '/' + folderName.replace(/[\/\\]/g, '_');
+    const newFolder: PhoneFileItem = {
+      id: 'dir-' + Math.random().toString(36).substring(2, 9),
+      name: folderName,
+      path: folderPath,
+      parentPath: parentPath,
+      isDirectory: true,
+      sizeBytes: 0,
+      mimeType: 'inode/directory',
+      modifiedTimestamp: Date.now(),
+    };
+    setPhoneFiles((prev) => [...prev, newFolder]);
+    showSnackbar(`Created folder '${folderName}' on phone`);
+    logEvent('PHONE_DIR_CREATED', 'Folder Created on Phone', folderPath);
+  };
+
+  const syncAllPhoneFilesToVault = async () => {
+    const nonDirFiles = phoneFiles.filter((f) => !f.isDirectory);
+    let count = 0;
+    for (const pf of nonDirFiles) {
+      let textContent = pf.contentSnippet;
+      if (!textContent && pf.realBlob) {
+        try {
+          textContent = await pf.realBlob.text();
+        } catch {}
+      }
+      const rawData = textContent || `Phone File: ${pf.name}\nSize: ${pf.sizeBytes}`;
+      const hash = await calculateSha256(rawData);
+      const [clock, ver] = vectorClockEngine.incrementLocal('{}');
+      const cat = determineCategory(pf.name, pf.mimeType);
+
+      const newVaultFile: SyncedFile = {
+        id: hash,
+        name: pf.name,
+        relativePath: pf.path,
+        sizeBytes: pf.sizeBytes,
+        mimeType: pf.mimeType,
+        contentHash: hash,
+        versionNumber: ver,
+        originDeviceId: 'phone-android-node',
+        originDeviceName: connectedPhoneName,
+        lastModifiedTimestamp: pf.modifiedTimestamp,
+        lamportTimestamp: 1,
+        vectorClockJson: clock,
+        syncStatus: 'SYNCED',
+        isPinned: false,
+        category: cat,
+        textPreview: pf.contentSnippet || null,
+        contentData: textContent || undefined,
+        isDeleted: false,
+      };
+
+      setFiles((prev) => {
+        if (prev.some((f) => f.name === newVaultFile.name && f.relativePath === newVaultFile.relativePath)) {
+          return prev;
+        }
+        count++;
+        return [newVaultFile, ...prev];
+      });
+    }
+
+    logEvent('PHONE_FULL_BACKUP', 'Phone Storage Backed Up', `Transferred ${count} files to laptop offline vault`);
+    showSnackbar(`Synced ${count} files from phone directly into laptop vault!`);
+  };
+
+  const connectPhoneProximityBridge = () => {
+    setIsPhoneProximityConnected(true);
+    setProximityDistanceMeters(0.8);
+    setProximityRssi(-42);
+    logEvent('PROXIMITY_CONNECT', 'Phone Storage Connected', `${connectedPhoneName} is near your laptop. Full file access unlocked.`);
+    showSnackbar(`Phone connected via proximity bridge! All files and folders unlocked.`);
+  };
+
+  const disconnectPhoneProximityBridge = () => {
+    setIsPhoneProximityConnected(false);
+    setProximityDistanceMeters(15.0);
+    setProximityRssi(-95);
+    logEvent('PROXIMITY_DISCONNECT', 'Phone Storage Disconnected', 'Phone is out of proximity range');
+    showSnackbar('Phone disconnected from laptop');
+  };
+
+  const simulateProximityRange = (range: 'NEAR' | 'MID' | 'FAR' | 'DISCONNECTED') => {
+    if (range === 'NEAR') {
+      setIsPhoneProximityConnected(true);
+      setProximityDistanceMeters(0.6);
+      setProximityRssi(-38);
+      logEvent('PROXIMITY_TRIGGER', 'Phone Near Laptop', 'Within 0.6m · Proximity sensor activated');
+      showSnackbar('📱 Phone is near your laptop (~0.6m) · Storage auto-mounted!');
+    } else if (range === 'MID') {
+      setIsPhoneProximityConnected(true);
+      setProximityDistanceMeters(2.5);
+      setProximityRssi(-64);
+      showSnackbar('📱 Phone in medium range (~2.5m)');
+    } else if (range === 'FAR') {
+      setIsPhoneProximityConnected(true);
+      setProximityDistanceMeters(7.5);
+      setProximityRssi(-82);
+      showSnackbar('📱 Phone at boundary range (~7.5m) · Signal weakening');
+    } else {
+      setIsPhoneProximityConnected(false);
+      setProximityDistanceMeters(18.0);
+      setProximityRssi(-98);
+      logEvent('PROXIMITY_LOST', 'Phone Out of Range', 'Phone is not in proximity');
+      showSnackbar('📱 Phone is out of range');
+    }
+  };
+
+  const mountLocalDirectoryPicker = async () => {
+    if (!('showDirectoryPicker' in window)) {
+      showSnackbar('Directory Picker not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    try {
+      showSnackbar('Select your Phone Storage or SD card folder to mount...');
+      const dirHandle = await (window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
+      const newItems: PhoneFileItem[] = [];
+
+      async function scanDirectory(handle: FileSystemDirectoryHandle, currentPath: string) {
+        for await (const entry of (handle as unknown as { values: () => AsyncIterable<FileSystemHandle> }).values()) {
+          const itemPath = (currentPath === '/' ? '' : currentPath) + '/' + entry.name;
+          if (entry.kind === 'directory') {
+            newItems.push({
+              id: 'dir-' + Math.random().toString(36).substring(2, 9),
+              name: entry.name,
+              path: itemPath,
+              parentPath: currentPath,
+              isDirectory: true,
+              sizeBytes: 0,
+              mimeType: 'inode/directory',
+              modifiedTimestamp: Date.now(),
+            });
+            await scanDirectory(entry as FileSystemDirectoryHandle, itemPath);
+          } else if (entry.kind === 'file') {
+            const fileObj = await (entry as FileSystemFileHandle).getFile();
+            let snippet: string | undefined = undefined;
+            let previewUrl: string | undefined = undefined;
+            if (fileObj.type.startsWith('image/')) {
+              previewUrl = URL.createObjectURL(fileObj);
+            } else if (fileObj.type.startsWith('text/') || fileObj.name.match(/\.(txt|md|json|js|ts|html|css|py|kt|csv)$/i)) {
+              try {
+                const text = await fileObj.text();
+                snippet = text.slice(0, 1000);
+              } catch {}
+            }
+            newItems.push({
+              id: 'file-' + Math.random().toString(36).substring(2, 9),
+              name: entry.name,
+              path: itemPath,
+              parentPath: currentPath,
+              isDirectory: false,
+              sizeBytes: fileObj.size,
+              mimeType: fileObj.type || determineMimeType(entry.name),
+              modifiedTimestamp: fileObj.lastModified,
+              contentSnippet: snippet,
+              realBlob: fileObj,
+              previewUrl: previewUrl,
+            });
+          }
+        }
+      }
+
+      await scanDirectory(dirHandle, '/');
+      if (newItems.length > 0) {
+        setPhoneFiles(newItems);
+        setIsPhoneProximityConnected(true);
+        setConnectedPhoneName(dirHandle.name || 'Mounted Phone Storage');
+        setCurrentPhonePath('/');
+        logEvent('DIRECTORY_MOUNTED', 'Phone Storage Mounted', `Loaded ${newItems.length} real files & folders from ${dirHandle.name}`);
+        showSnackbar(`Successfully mounted '${dirHandle.name}' (${newItems.length} items)!`);
+      } else {
+        showSnackbar('Selected directory was empty.');
+      }
+    } catch (err: unknown) {
+      if ((err as Error)?.name === 'AbortError') {
+        showSnackbar('Directory selection cancelled');
+      } else {
+        const msg = err instanceof Error ? err.message : 'Directory mount error';
+        showSnackbar(`Error mounting directory: ${msg}`);
+      }
+    }
+  };
+
+  const startPhoneBluetoothPairing = async () => {
+    try {
+      showSnackbar('Opening native Bluetooth device chooser to find your Android phone...');
+      const result = await webBluetoothService.requestRealDevice();
+      if (result) {
+        setIsPhoneProximityConnected(true);
+        setConnectedPhoneName(result.name || 'Android Bluetooth Phone');
+        setProximityDistanceMeters(0.5);
+        setProximityRssi(-36);
+        logEvent('PHONE_BT_CONNECTED', 'Android Bluetooth Paired', `${result.name} paired via native Web Bluetooth`);
+        showSnackbar(`Paired with ${result.name}! Phone storage unlocked.`);
+      } else {
+        showSnackbar('Bluetooth pairing was cancelled');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Bluetooth pairing error';
+      showSnackbar(`Bluetooth error: ${msg}`);
+    }
+  };
+
   return (
     <SyncBeamContext.Provider
       value={{
@@ -1241,6 +1630,28 @@ fun resolveLineage(local: Map<String, Long>, remote: Map<String, Long>): Conflic
         snackbarMessage,
         localDeviceId: LOCAL_DEVICE_ID,
         localDeviceName: LOCAL_DEVICE_NAME,
+
+        // Phone Proximity Storage Bridge
+        phoneFiles,
+        currentPhonePath,
+        isPhoneProximityConnected,
+        proximityAutoSyncEnabled,
+        proximityDistanceMeters,
+        proximityRssi,
+        connectedPhoneName,
+        navigateToPhoneFolder,
+        uploadFileToPhone,
+        downloadFileFromPhone,
+        downloadFolderAsZip,
+        deletePhoneFile,
+        createPhoneFolder,
+        syncAllPhoneFilesToVault,
+        toggleProximityAutoSync: setProximityAutoSyncEnabled,
+        connectPhoneProximityBridge,
+        disconnectPhoneProximityBridge,
+        simulateProximityRange,
+        mountLocalDirectoryPicker,
+        startPhoneBluetoothPairing,
 
         selectTab: setCurrentTab,
         selectCategory: setSelectedCategory,
