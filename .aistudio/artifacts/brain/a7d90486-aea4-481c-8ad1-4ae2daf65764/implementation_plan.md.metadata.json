@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan to replace simulated mock devices with real Web Bluetooth API hardware discovery, GATT connection management, local cross-window P2P fallback mesh, and clean empty states.",
+  "updatedAt": "2026-10-16T08:50:42.496808042Z",
+  "requestFeedback": true,
+  "userFacing": true
+}
